@@ -1,6 +1,6 @@
 from expressions import *
 from itertools import product
-
+import copy
 
 def canonical_dnf(exp: Expression, varlist: list) -> Expression:
 	n = len(varlist)
@@ -29,7 +29,8 @@ def canonical_dnf(exp: Expression, varlist: list) -> Expression:
 
 	else:
 		return multi_or(exprs)		
-	
+
+
 def canonical_cnf(exp: Expression, varlist: list) -> Expression:
 	n = len(varlist)
 	ever_false = False
@@ -83,6 +84,7 @@ def cnf_str_refactor(cnfstr : str) -> str:
 			refactored += c
 	return refactored + ")"
 
+
 def multi_or(exprs: list) -> Expression:
 	assert len(exprs) != 0
 	or_expression = exprs[0]
@@ -116,3 +118,70 @@ def apply_values(varlist: list, values: list) -> None:
 def reset_values(varlist: list) -> None:
 	for i in range(len(varlist)):
 		varlist[i].value = None
+
+
+# convers a CNF formula that has been encoded via Expression objects in tree form
+# into array form given a mapping of the variable names to positive numbers.
+# This is the format commonly used in libraries.
+# Example:
+# varname_mapping = {'A': 1, 'B': 2, 'C' = 3}
+# Expression = (A∨¬B∨¬C)∧(B∨C)
+# output = [[1, -2, -3], [2,3]]
+def convert_dnf_format(expression: Expression, varname_mapping: dict) -> None:
+	
+	for val in varname_mapping.values():
+		assert val > 0
+
+		done = False
+
+		clauses = [] 
+
+		current_expression = copy.deepcopy(expression)
+
+		# read literals one after another
+		while not done:
+			clause = None
+			if isinstance(current_expression, AND):
+				clause = current_expression.right
+
+				current_expression = current_expression.left
+			else:
+				clause = current_expression
+				done = True
+
+			clauses.append(parse_clause(clause, varname_mapping))
+
+		clauses.reverse()
+		return clauses
+
+
+def parse_clause(expression: Expression, varname_mapping: dict) -> None:
+	for val in varname_mapping.values():
+		assert val > 0
+
+	done = False
+
+	literals = []
+
+	current_expression = copy.deepcopy(expression)
+	# read literals one after another
+	while not done:
+		literal = None
+		if isinstance(current_expression, OR):
+			literal = current_expression.right
+
+			current_expression = current_expression.left
+		else:
+			literal = current_expression
+			done = True
+
+		if isinstance(literal, NOT):
+			literal_number = varname_mapping[literal.exp.name]
+			literals.append(-literal_number)
+		elif isinstance(literal, Variable):
+			literal_number = varname_mapping[literal.name]
+			literals.append(literal_number)
+		else:
+			raise Exception("CNF was not properly formatted. Could not parse" + 
+				"Literal")
+	return sorted(literals, key=abs)
